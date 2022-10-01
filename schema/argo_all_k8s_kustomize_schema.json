@@ -11471,6 +11471,39 @@
                 }
             ]
         },
+        "io.argoproj.workflow.v1alpha1.ArtGCStatus": {
+            "description": "ArtGCStatus maintains state related to ArtifactGC",
+            "type": "object",
+            "properties": {
+                "notSpecified": {
+                    "description": "if this is true, we already checked to see if we need to do it and we don't",
+                    "type": "boolean"
+                },
+                "podsRecouped": {
+                    "description": "have completed Pods been processed? (mapped by Pod name) used to prevent re-processing the Status of a Pod more than once",
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "boolean",
+                        "default": false
+                    }
+                },
+                "strategiesProcessed": {
+                    "description": "have Pods been started to perform this strategy? (enables us not to re-process what we've already done)",
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "boolean",
+                        "default": false
+                    }
+                }
+            },
+            "x-kubernetes-group-version-kind": [
+                {
+                    "group": "argoproj.io",
+                    "kind": "ArtGCStatus",
+                    "version": "v1alpha1"
+                }
+            ]
+        },
         "io.argoproj.workflow.v1alpha1.Artifact": {
             "description": "Artifact indicates an artifact to place at a specified path",
             "type": "object",
@@ -11486,9 +11519,21 @@
                     "description": "ArchiveLogs indicates if the container logs should be archived",
                     "type": "boolean"
                 },
+                "artifactGC": {
+                    "description": "ArtifactGC describes the strategy to use when to deleting an artifact from completed or deleted workflows",
+                    "$ref": "#/definitions/io.argoproj.workflow.v1alpha1.ArtifactGC"
+                },
                 "artifactory": {
                     "description": "Artifactory contains artifactory artifact location details",
                     "$ref": "#/definitions/io.argoproj.workflow.v1alpha1.ArtifactoryArtifact"
+                },
+                "azure": {
+                    "description": "Azure contains Azure Storage artifact location details",
+                    "$ref": "#/definitions/io.argoproj.workflow.v1alpha1.AzureArtifact"
+                },
+                "deleted": {
+                    "description": "Has this been deleted?",
+                    "type": "boolean"
                 },
                 "from": {
                     "description": "From allows an artifact to reference an artifact from a previous step",
@@ -11565,6 +11610,73 @@
                 }
             ]
         },
+        "io.argoproj.workflow.v1alpha1.ArtifactGC": {
+            "description": "ArtifactGC describes how to delete artifacts from completed Workflows",
+            "type": "object",
+            "properties": {
+                "podMetadata": {
+                    "description": "PodMetadata is an optional field for specifying the Labels and Annotations that should be assigned to the Pod doing the deletion",
+                    "$ref": "#/definitions/io.argoproj.workflow.v1alpha1.Metadata"
+                },
+                "serviceAccountName": {
+                    "description": "ServiceAccountName is an optional field for specifying the Service Account that should be assigned to the Pod doing the deletion",
+                    "type": "string"
+                },
+                "strategy": {
+                    "description": "Strategy is the strategy to use.",
+                    "type": "string"
+                }
+            },
+            "x-kubernetes-group-version-kind": [
+                {
+                    "group": "argoproj.io",
+                    "kind": "ArtifactGC",
+                    "version": "v1alpha1"
+                }
+            ]
+        },
+        "io.argoproj.workflow.v1alpha1.ArtifactGCSpec": {
+            "description": "ArtifactGCSpec specifies the Artifacts that need to be deleted",
+            "type": "object",
+            "properties": {
+                "artifactsByNode": {
+                    "description": "ArtifactsByNode maps Node name to information pertaining to Artifacts on that Node",
+                    "type": "object",
+                    "additionalProperties": {
+                        "default": {},
+                        "$ref": "#/definitions/io.argoproj.workflow.v1alpha1.ArtifactNodeSpec"
+                    }
+                }
+            },
+            "x-kubernetes-group-version-kind": [
+                {
+                    "group": "argoproj.io",
+                    "kind": "ArtifactGCSpec",
+                    "version": "v1alpha1"
+                }
+            ]
+        },
+        "io.argoproj.workflow.v1alpha1.ArtifactGCStatus": {
+            "description": "ArtifactGCStatus describes the result of the deletion",
+            "type": "object",
+            "properties": {
+                "artifactResultsByNode": {
+                    "description": "ArtifactResultsByNode maps Node name to result",
+                    "type": "object",
+                    "additionalProperties": {
+                        "default": {},
+                        "$ref": "#/definitions/io.argoproj.workflow.v1alpha1.ArtifactResultNodeStatus"
+                    }
+                }
+            },
+            "x-kubernetes-group-version-kind": [
+                {
+                    "group": "argoproj.io",
+                    "kind": "ArtifactGCStatus",
+                    "version": "v1alpha1"
+                }
+            ]
+        },
         "io.argoproj.workflow.v1alpha1.ArtifactLocation": {
             "description": "ArtifactLocation describes a location for a single or multiple artifacts. It is used as single artifact in the context of inputs/outputs (e.g. outputs.artifacts.artname). It is also used to describe the location of multiple artifacts such as the archive location of a single workflow step, which the executor will use as a default location to store its files.",
             "type": "object",
@@ -11576,6 +11688,10 @@
                 "artifactory": {
                     "description": "Artifactory contains artifactory artifact location details",
                     "$ref": "#/definitions/io.argoproj.workflow.v1alpha1.ArtifactoryArtifact"
+                },
+                "azure": {
+                    "description": "Azure contains Azure Storage artifact location details",
+                    "$ref": "#/definitions/io.argoproj.workflow.v1alpha1.AzureArtifact"
                 },
                 "gcs": {
                     "description": "GCS contains GCS artifact location details",
@@ -11614,6 +11730,31 @@
                 }
             ]
         },
+        "io.argoproj.workflow.v1alpha1.ArtifactNodeSpec": {
+            "description": "ArtifactNodeSpec specifies the Artifacts that need to be deleted for a given Node",
+            "type": "object",
+            "properties": {
+                "archiveLocation": {
+                    "description": "ArchiveLocation is the template-level Artifact location specification",
+                    "$ref": "#/definitions/io.argoproj.workflow.v1alpha1.ArtifactLocation"
+                },
+                "artifacts": {
+                    "description": "Artifacts maps artifact name to Artifact description",
+                    "type": "object",
+                    "additionalProperties": {
+                        "default": {},
+                        "$ref": "#/definitions/io.argoproj.workflow.v1alpha1.Artifact"
+                    }
+                }
+            },
+            "x-kubernetes-group-version-kind": [
+                {
+                    "group": "argoproj.io",
+                    "kind": "ArtifactNodeSpec",
+                    "version": "v1alpha1"
+                }
+            ]
+        },
         "io.argoproj.workflow.v1alpha1.ArtifactPaths": {
             "description": "ArtifactPaths expands a step from a collection of artifacts",
             "type": "object",
@@ -11629,9 +11770,21 @@
                     "description": "ArchiveLogs indicates if the container logs should be archived",
                     "type": "boolean"
                 },
+                "artifactGC": {
+                    "description": "ArtifactGC describes the strategy to use when to deleting an artifact from completed or deleted workflows",
+                    "$ref": "#/definitions/io.argoproj.workflow.v1alpha1.ArtifactGC"
+                },
                 "artifactory": {
                     "description": "Artifactory contains artifactory artifact location details",
                     "$ref": "#/definitions/io.argoproj.workflow.v1alpha1.ArtifactoryArtifact"
+                },
+                "azure": {
+                    "description": "Azure contains Azure Storage artifact location details",
+                    "$ref": "#/definitions/io.argoproj.workflow.v1alpha1.AzureArtifact"
+                },
+                "deleted": {
+                    "description": "Has this been deleted?",
+                    "type": "boolean"
                 },
                 "from": {
                     "description": "From allows an artifact to reference an artifact from a previous step",
@@ -11720,6 +11873,10 @@
                     "description": "Artifactory stores artifacts to JFrog Artifactory",
                     "$ref": "#/definitions/io.argoproj.workflow.v1alpha1.ArtifactoryArtifactRepository"
                 },
+                "azure": {
+                    "description": "Azure stores artifact in an Azure Storage account",
+                    "$ref": "#/definitions/io.argoproj.workflow.v1alpha1.AzureArtifactRepository"
+                },
                 "gcs": {
                     "description": "GCS stores artifact in a GCS object store",
                     "$ref": "#/definitions/io.argoproj.workflow.v1alpha1.GCSArtifactRepository"
@@ -11793,6 +11950,118 @@
                 {
                     "group": "argoproj.io",
                     "kind": "ArtifactRepositoryRefStatus",
+                    "version": "v1alpha1"
+                }
+            ]
+        },
+        "io.argoproj.workflow.v1alpha1.ArtifactResult": {
+            "description": "ArtifactResult describes the result of attempting to delete a given Artifact",
+            "type": "object",
+            "required": [
+                "name"
+            ],
+            "properties": {
+                "error": {
+                    "description": "Error is an optional error message which should be set if Success==false",
+                    "type": "string"
+                },
+                "name": {
+                    "description": "Name is the name of the Artifact",
+                    "type": "string",
+                    "default": ""
+                },
+                "success": {
+                    "description": "Success describes whether the deletion succeeded",
+                    "type": "boolean"
+                }
+            },
+            "x-kubernetes-group-version-kind": [
+                {
+                    "group": "argoproj.io",
+                    "kind": "ArtifactResult",
+                    "version": "v1alpha1"
+                }
+            ]
+        },
+        "io.argoproj.workflow.v1alpha1.ArtifactResultNodeStatus": {
+            "description": "ArtifactResultNodeStatus describes the result of the deletion on a given node",
+            "type": "object",
+            "properties": {
+                "artifactResults": {
+                    "description": "ArtifactResults maps Artifact name to result of the deletion",
+                    "type": "object",
+                    "additionalProperties": {
+                        "default": {},
+                        "$ref": "#/definitions/io.argoproj.workflow.v1alpha1.ArtifactResult"
+                    }
+                }
+            },
+            "x-kubernetes-group-version-kind": [
+                {
+                    "group": "argoproj.io",
+                    "kind": "ArtifactResultNodeStatus",
+                    "version": "v1alpha1"
+                }
+            ]
+        },
+        "io.argoproj.workflow.v1alpha1.ArtifactSearchQuery": {
+            "type": "object",
+            "properties": {
+                "artifactGCStrategies": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "boolean",
+                        "default": false
+                    }
+                },
+                "artifactName": {
+                    "type": "string"
+                },
+                "deleted": {
+                    "type": "boolean"
+                },
+                "nodeId": {
+                    "type": "string"
+                },
+                "nodeTypes": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "boolean",
+                        "default": false
+                    }
+                },
+                "templateName": {
+                    "type": "string"
+                }
+            },
+            "x-kubernetes-group-version-kind": [
+                {
+                    "group": "argoproj.io",
+                    "kind": "ArtifactSearchQuery",
+                    "version": "v1alpha1"
+                }
+            ]
+        },
+        "io.argoproj.workflow.v1alpha1.ArtifactSearchResult": {
+            "type": "object",
+            "required": [
+                "Artifact",
+                "NodeID"
+            ],
+            "properties": {
+                "Artifact": {
+                    "default": {},
+                    "$ref": "#/definitions/io.argoproj.workflow.v1alpha1.Artifact"
+                },
+                "NodeID": {
+                    "type": "string",
+                    "default": ""
+                }
+            },
+            "x-kubernetes-group-version-kind": [
+                {
+                    "group": "argoproj.io",
+                    "kind": "ArtifactSearchResult",
                     "version": "v1alpha1"
                 }
             ]
@@ -11872,6 +12141,121 @@
                 }
             ]
         },
+        "io.argoproj.workflow.v1alpha1.AzureArtifact": {
+            "description": "AzureArtifact is the location of a an Azure Storage artifact",
+            "type": "object",
+            "required": [
+                "endpoint",
+                "container",
+                "blob"
+            ],
+            "properties": {
+                "accountKeySecret": {
+                    "description": "AccountKeySecret is the secret selector to the Azure Blob Storage account access key",
+                    "$ref": "#/definitions/io.k8s.api.core.v1.SecretKeySelector"
+                },
+                "blob": {
+                    "description": "Blob is the blob name (i.e., path) in the container where the artifact resides",
+                    "type": "string",
+                    "default": ""
+                },
+                "container": {
+                    "description": "Container is the container where resources will be stored",
+                    "type": "string",
+                    "default": ""
+                },
+                "endpoint": {
+                    "description": "Endpoint is the service url associated with an account. It is most likely \"https://\u003cACCOUNT_NAME\u003e.blob.core.windows.net\"",
+                    "type": "string",
+                    "default": ""
+                },
+                "useSDKCreds": {
+                    "description": "UseSDKCreds tells the driver to figure out credentials based on sdk defaults.",
+                    "type": "boolean"
+                }
+            },
+            "x-kubernetes-group-version-kind": [
+                {
+                    "group": "argoproj.io",
+                    "kind": "AzureArtifact",
+                    "version": "v1alpha1"
+                }
+            ]
+        },
+        "io.argoproj.workflow.v1alpha1.AzureArtifactRepository": {
+            "description": "AzureArtifactRepository defines the controller configuration for an Azure Blob Storage artifact repository",
+            "type": "object",
+            "required": [
+                "endpoint",
+                "container"
+            ],
+            "properties": {
+                "accountKeySecret": {
+                    "description": "AccountKeySecret is the secret selector to the Azure Blob Storage account access key",
+                    "$ref": "#/definitions/io.k8s.api.core.v1.SecretKeySelector"
+                },
+                "blobNameFormat": {
+                    "description": "BlobNameFormat is defines the format of how to store blob names. Can reference workflow variables",
+                    "type": "string"
+                },
+                "container": {
+                    "description": "Container is the container where resources will be stored",
+                    "type": "string",
+                    "default": ""
+                },
+                "endpoint": {
+                    "description": "Endpoint is the service url associated with an account. It is most likely \"https://\u003cACCOUNT_NAME\u003e.blob.core.windows.net\"",
+                    "type": "string",
+                    "default": ""
+                },
+                "useSDKCreds": {
+                    "description": "UseSDKCreds tells the driver to figure out credentials based on sdk defaults.",
+                    "type": "boolean"
+                }
+            },
+            "x-kubernetes-group-version-kind": [
+                {
+                    "group": "argoproj.io",
+                    "kind": "AzureArtifactRepository",
+                    "version": "v1alpha1"
+                }
+            ]
+        },
+        "io.argoproj.workflow.v1alpha1.AzureBlobContainer": {
+            "description": "AzureBlobContainer contains the access information for interfacing with an Azure Blob Storage container",
+            "type": "object",
+            "required": [
+                "endpoint",
+                "container"
+            ],
+            "properties": {
+                "accountKeySecret": {
+                    "description": "AccountKeySecret is the secret selector to the Azure Blob Storage account access key",
+                    "$ref": "#/definitions/io.k8s.api.core.v1.SecretKeySelector"
+                },
+                "container": {
+                    "description": "Container is the container where resources will be stored",
+                    "type": "string",
+                    "default": ""
+                },
+                "endpoint": {
+                    "description": "Endpoint is the service url associated with an account. It is most likely \"https://\u003cACCOUNT_NAME\u003e.blob.core.windows.net\"",
+                    "type": "string",
+                    "default": ""
+                },
+                "useSDKCreds": {
+                    "description": "UseSDKCreds tells the driver to figure out credentials based on sdk defaults.",
+                    "type": "boolean"
+                }
+            },
+            "x-kubernetes-group-version-kind": [
+                {
+                    "group": "argoproj.io",
+                    "kind": "AzureBlobContainer",
+                    "version": "v1alpha1"
+                }
+            ]
+        },
         "io.argoproj.workflow.v1alpha1.Backoff": {
             "description": "Backoff is a backoff strategy to use within retryStrategy",
             "type": "object",
@@ -11897,6 +12281,27 @@
                 }
             ]
         },
+        "io.argoproj.workflow.v1alpha1.BasicAuth": {
+            "description": "BasicAuth describes the secret selectors required for basic authentication",
+            "type": "object",
+            "properties": {
+                "passwordSecret": {
+                    "description": "PasswordSecret is the secret selector to the repository password",
+                    "$ref": "#/definitions/io.k8s.api.core.v1.SecretKeySelector"
+                },
+                "usernameSecret": {
+                    "description": "UsernameSecret is the secret selector to the repository username",
+                    "$ref": "#/definitions/io.k8s.api.core.v1.SecretKeySelector"
+                }
+            },
+            "x-kubernetes-group-version-kind": [
+                {
+                    "group": "argoproj.io",
+                    "kind": "BasicAuth",
+                    "version": "v1alpha1"
+                }
+            ]
+        },
         "io.argoproj.workflow.v1alpha1.Cache": {
             "description": "Cache is the configuration for the type of cache to be used",
             "type": "object",
@@ -11913,6 +12318,25 @@
                 {
                     "group": "argoproj.io",
                     "kind": "Cache",
+                    "version": "v1alpha1"
+                }
+            ]
+        },
+        "io.argoproj.workflow.v1alpha1.ClientCertAuth": {
+            "description": "ClientCertAuth holds necessary information for client authentication via certificates",
+            "type": "object",
+            "properties": {
+                "clientCertSecret": {
+                    "$ref": "#/definitions/io.k8s.api.core.v1.SecretKeySelector"
+                },
+                "clientKeySecret": {
+                    "$ref": "#/definitions/io.k8s.api.core.v1.SecretKeySelector"
+                }
+            },
+            "x-kubernetes-group-version-kind": [
+                {
+                    "group": "argoproj.io",
+                    "kind": "ClientCertAuth",
                     "version": "v1alpha1"
                 }
             ]
@@ -12084,7 +12508,7 @@
                     "default": ""
                 },
                 "ports": {
-                    "description": "List of ports to expose from the container. Exposing a port here gives the system additional information about the network connections a container uses, but is primarily informational. Not specifying a port here DOES NOT prevent that port from being exposed. Any port which is listening on the default \"0.0.0.0\" address inside a container will be accessible from the network. Cannot be updated.",
+                    "description": "List of ports to expose from the container. Not specifying a port here DOES NOT prevent that port from being exposed. Any port which is listening on the default \"0.0.0.0\" address inside a container will be accessible from the network. Modifying this array with strategic merge patch may corrupt the data. For more information See https://github.com/kubernetes/kubernetes/issues/108255. Cannot be updated.",
                     "type": "array",
                     "items": {
                         "default": {},
@@ -12766,6 +13190,10 @@
                 "repo"
             ],
             "properties": {
+                "branch": {
+                    "description": "Branch is the branch to fetch when `SingleBranch` is enabled",
+                    "type": "string"
+                },
                 "depth": {
                     "description": "Depth specifies clones/fetches should be shallow and include the given number of commits from the branch tip",
                     "type": "integer",
@@ -12799,6 +13227,10 @@
                 "revision": {
                     "description": "Revision is the git commit, tag, branch to checkout",
                     "type": "string"
+                },
+                "singleBranch": {
+                    "description": "SingleBranch enables single branch clone, using the `branch` parameter",
+                    "type": "boolean"
                 },
                 "sshPrivateKeySecret": {
                     "description": "SSHPrivateKeySecret is the secret selector to the repository ssh private key",
@@ -13031,6 +13463,10 @@
                     "description": "Body is content of the HTTP Request",
                     "type": "string"
                 },
+                "bodyFrom": {
+                    "description": "BodyFrom is  content of the HTTP Request as Bytes",
+                    "$ref": "#/definitions/io.argoproj.workflow.v1alpha1.HTTPBodySource"
+                },
                 "headers": {
                     "description": "Headers are an optional list of headers to send with HTTP requests",
                     "type": "array",
@@ -13040,7 +13476,7 @@
                     }
                 },
                 "insecureSkipVerify": {
-                    "description": "insecureSkipVerify is a bool when if set to true will skip TLS verification for the HTTP client",
+                    "description": "InsecureSkipVerify is a bool when if set to true will skip TLS verification for the HTTP client",
                     "type": "boolean"
                 },
                 "method": {
@@ -13071,12 +13507,16 @@
             ]
         },
         "io.argoproj.workflow.v1alpha1.HTTPArtifact": {
-            "description": "HTTPArtifact allows an file served on HTTP to be placed as an input artifact in a container",
+            "description": "HTTPArtifact allows a file served on HTTP to be placed as an input artifact in a container",
             "type": "object",
             "required": [
                 "url"
             ],
             "properties": {
+                "auth": {
+                    "description": "Auth contains information for client authentication",
+                    "$ref": "#/definitions/io.argoproj.workflow.v1alpha1.HTTPAuth"
+                },
                 "headers": {
                     "description": "Headers are an optional list of headers to send with HTTP requests for artifacts",
                     "type": "array",
@@ -13095,6 +13535,47 @@
                 {
                     "group": "argoproj.io",
                     "kind": "HTTPArtifact",
+                    "version": "v1alpha1"
+                }
+            ]
+        },
+        "io.argoproj.workflow.v1alpha1.HTTPAuth": {
+            "type": "object",
+            "properties": {
+                "basicAuth": {
+                    "default": {},
+                    "$ref": "#/definitions/io.argoproj.workflow.v1alpha1.BasicAuth"
+                },
+                "clientCert": {
+                    "default": {},
+                    "$ref": "#/definitions/io.argoproj.workflow.v1alpha1.ClientCertAuth"
+                },
+                "oauth2": {
+                    "default": {},
+                    "$ref": "#/definitions/io.argoproj.workflow.v1alpha1.OAuth2Auth"
+                }
+            },
+            "x-kubernetes-group-version-kind": [
+                {
+                    "group": "argoproj.io",
+                    "kind": "HTTPAuth",
+                    "version": "v1alpha1"
+                }
+            ]
+        },
+        "io.argoproj.workflow.v1alpha1.HTTPBodySource": {
+            "description": "HTTPBodySource contains the source of the HTTP body.",
+            "type": "object",
+            "properties": {
+                "bytes": {
+                    "type": "string",
+                    "format": "byte"
+                }
+            },
+            "x-kubernetes-group-version-kind": [
+                {
+                    "group": "argoproj.io",
+                    "kind": "HTTPBodySource",
                     "version": "v1alpha1"
                 }
             ]
@@ -13358,6 +13839,25 @@
                 {
                     "group": "argoproj.io",
                     "kind": "Link",
+                    "version": "v1alpha1"
+                }
+            ]
+        },
+        "io.argoproj.workflow.v1alpha1.ManifestFrom": {
+            "type": "object",
+            "required": [
+                "artifact"
+            ],
+            "properties": {
+                "artifact": {
+                    "description": "Artifact contains the artifact to use",
+                    "$ref": "#/definitions/io.argoproj.workflow.v1alpha1.Artifact"
+                }
+            },
+            "x-kubernetes-group-version-kind": [
+                {
+                    "group": "argoproj.io",
+                    "kind": "ManifestFrom",
                     "version": "v1alpha1"
                 }
             ]
@@ -13752,6 +14252,67 @@
                 {
                     "group": "argoproj.io",
                     "kind": "NoneStrategy",
+                    "version": "v1alpha1"
+                }
+            ]
+        },
+        "io.argoproj.workflow.v1alpha1.OAuth2Auth": {
+            "description": "OAuth2Auth holds all information for client authentication via OAuth2 tokens",
+            "type": "object",
+            "properties": {
+                "clientIDSecret": {
+                    "$ref": "#/definitions/io.k8s.api.core.v1.SecretKeySelector"
+                },
+                "clientSecretSecret": {
+                    "$ref": "#/definitions/io.k8s.api.core.v1.SecretKeySelector"
+                },
+                "endpointParams": {
+                    "type": "array",
+                    "items": {
+                        "default": {},
+                        "$ref": "#/definitions/io.argoproj.workflow.v1alpha1.OAuth2EndpointParam"
+                    }
+                },
+                "scopes": {
+                    "type": "array",
+                    "items": {
+                        "type": "string",
+                        "default": ""
+                    }
+                },
+                "tokenURLSecret": {
+                    "$ref": "#/definitions/io.k8s.api.core.v1.SecretKeySelector"
+                }
+            },
+            "x-kubernetes-group-version-kind": [
+                {
+                    "group": "argoproj.io",
+                    "kind": "OAuth2Auth",
+                    "version": "v1alpha1"
+                }
+            ]
+        },
+        "io.argoproj.workflow.v1alpha1.OAuth2EndpointParam": {
+            "description": "EndpointParam is for requesting optional fields that should be sent in the oauth request",
+            "type": "object",
+            "required": [
+                "key"
+            ],
+            "properties": {
+                "key": {
+                    "description": "Name is the header name",
+                    "type": "string",
+                    "default": ""
+                },
+                "value": {
+                    "description": "Value is the literal value to use for the header",
+                    "type": "string"
+                }
+            },
+            "x-kubernetes-group-version-kind": [
+                {
+                    "group": "argoproj.io",
+                    "kind": "OAuth2EndpointParam",
                     "version": "v1alpha1"
                 }
             ]
@@ -14155,6 +14716,10 @@
                     "description": "Manifest contains the kubernetes manifest",
                     "type": "string"
                 },
+                "manifestFrom": {
+                    "description": "ManifestFrom is the source for a single kubernetes manifest",
+                    "$ref": "#/definitions/io.argoproj.workflow.v1alpha1.ManifestFrom"
+                },
                 "mergeStrategy": {
                     "description": "MergeStrategy is the strategy used to merge a patch. It defaults to \"strategic\" Must be one of: strategic, merge, json",
                     "type": "string"
@@ -14220,7 +14785,7 @@
                     "type": "string"
                 },
                 "limit": {
-                    "description": "Limit is the maximum number of attempts when retrying a container",
+                    "description": "Limit is the maximum number of retry attempts when retrying a container. It does not include the original container; the maximum number of total attempts will be `limit + 1`.",
                     "$ref": "#/definitions/io.k8s.apimachinery.pkg.util.intstr.IntOrString"
                 },
                 "retryPolicy": {
@@ -14502,7 +15067,7 @@
                     "default": ""
                 },
                 "ports": {
-                    "description": "List of ports to expose from the container. Exposing a port here gives the system additional information about the network connections a container uses, but is primarily informational. Not specifying a port here DOES NOT prevent that port from being exposed. Any port which is listening on the default \"0.0.0.0\" address inside a container will be accessible from the network. Cannot be updated.",
+                    "description": "List of ports to expose from the container. Not specifying a port here DOES NOT prevent that port from being exposed. Any port which is listening on the default \"0.0.0.0\" address inside a container will be accessible from the network. Modifying this array with strategic merge patch may corrupt the data. For more information See https://github.com/kubernetes/kubernetes/issues/108255. Cannot be updated.",
                     "type": "array",
                     "items": {
                         "default": {},
@@ -15234,7 +15799,7 @@
                     "default": ""
                 },
                 "ports": {
-                    "description": "List of ports to expose from the container. Exposing a port here gives the system additional information about the network connections a container uses, but is primarily informational. Not specifying a port here DOES NOT prevent that port from being exposed. Any port which is listening on the default \"0.0.0.0\" address inside a container will be accessible from the network. Cannot be updated.",
+                    "description": "List of ports to expose from the container. Not specifying a port here DOES NOT prevent that port from being exposed. Any port which is listening on the default \"0.0.0.0\" address inside a container will be accessible from the network. Modifying this array with strategic merge patch may corrupt the data. For more information See https://github.com/kubernetes/kubernetes/issues/108255. Cannot be updated.",
                     "type": "array",
                     "items": {
                         "default": {},
@@ -15479,6 +16044,79 @@
                 }
             ]
         },
+        "io.argoproj.workflow.v1alpha1.WorkflowArtifactGCTask": {
+            "description": "WorkflowArtifactGCTask specifies the Artifacts that need to be deleted as well as the status of deletion",
+            "type": "object",
+            "required": [
+                "metadata",
+                "spec"
+            ],
+            "properties": {
+                "apiVersion": {
+                    "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+                    "type": "string"
+                },
+                "kind": {
+                    "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+                    "type": "string"
+                },
+                "metadata": {
+                    "default": {},
+                    "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta"
+                },
+                "spec": {
+                    "default": {},
+                    "$ref": "#/definitions/io.argoproj.workflow.v1alpha1.ArtifactGCSpec"
+                },
+                "status": {
+                    "default": {},
+                    "$ref": "#/definitions/io.argoproj.workflow.v1alpha1.ArtifactGCStatus"
+                }
+            },
+            "x-kubernetes-group-version-kind": [
+                {
+                    "group": "argoproj.io",
+                    "kind": "WorkflowArtifactGCTask",
+                    "version": "v1alpha1"
+                }
+            ]
+        },
+        "io.argoproj.workflow.v1alpha1.WorkflowArtifactGCTaskList": {
+            "description": "WorkflowArtifactGCTaskList is list of WorkflowArtifactGCTask resources",
+            "type": "object",
+            "required": [
+                "metadata",
+                "items"
+            ],
+            "properties": {
+                "apiVersion": {
+                    "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+                    "type": "string"
+                },
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "default": {},
+                        "$ref": "#/definitions/io.argoproj.workflow.v1alpha1.WorkflowArtifactGCTask"
+                    }
+                },
+                "kind": {
+                    "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+                    "type": "string"
+                },
+                "metadata": {
+                    "default": {},
+                    "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ListMeta"
+                }
+            },
+            "x-kubernetes-group-version-kind": [
+                {
+                    "group": "argoproj.io",
+                    "kind": "WorkflowArtifactGCTaskList",
+                    "version": "v1alpha1"
+                }
+            ]
+        },
         "io.argoproj.workflow.v1alpha1.WorkflowEventBinding": {
             "description": "WorkflowEventBinding is the definition of an event resource",
             "type": "object",
@@ -15663,6 +16301,10 @@
                     "default": {},
                     "$ref": "#/definitions/io.argoproj.workflow.v1alpha1.Arguments"
                 },
+                "artifactGC": {
+                    "description": "ArtifactGC describes the strategy to use when deleting artifacts from completed or deleted workflows (applies to all output Artifacts unless Artifact.ArtifactGC is specified, which overrides this)",
+                    "$ref": "#/definitions/io.argoproj.workflow.v1alpha1.ArtifactGC"
+                },
                 "artifactRepositoryRef": {
                     "description": "ArtifactRepositoryRef specifies the configMap name and key containing the artifact repository config.",
                     "$ref": "#/definitions/io.argoproj.workflow.v1alpha1.ArtifactRepositoryRef"
@@ -15744,7 +16386,7 @@
                     "$ref": "#/definitions/io.k8s.api.policy.v1beta1.PodDisruptionBudgetSpec"
                 },
                 "podGC": {
-                    "description": "PodGC describes the strategy to use when to deleting completed pods",
+                    "description": "PodGC describes the strategy to use when deleting completed pods",
                     "$ref": "#/definitions/io.argoproj.workflow.v1alpha1.PodGC"
                 },
                 "podMetadata": {
@@ -15752,7 +16394,7 @@
                     "$ref": "#/definitions/io.argoproj.workflow.v1alpha1.Metadata"
                 },
                 "podPriority": {
-                    "description": "Priority to apply to workflow pods.",
+                    "description": "Priority to apply to workflow pods. DEPRECATED: Use PodPriorityClassName instead.",
                     "type": "integer",
                     "format": "int32"
                 },
@@ -15826,7 +16468,7 @@
                     "$ref": "#/definitions/io.argoproj.workflow.v1alpha1.TTLStrategy"
                 },
                 "volumeClaimGC": {
-                    "description": "VolumeClaimGC describes the strategy to use when to deleting volumes from completed workflows",
+                    "description": "VolumeClaimGC describes the strategy to use when deleting volumes from completed workflows",
                     "$ref": "#/definitions/io.argoproj.workflow.v1alpha1.VolumeClaimGC"
                 },
                 "volumeClaimTemplates": {
@@ -15850,7 +16492,7 @@
                     "x-kubernetes-patch-strategy": "merge"
                 },
                 "workflowMetadata": {
-                    "description": "WorkflowMetadata contains some metadata of the workflow to be refer",
+                    "description": "WorkflowMetadata contains some metadata of the workflow to refer to",
                     "$ref": "#/definitions/io.argoproj.workflow.v1alpha1.WorkflowMetadata"
                 },
                 "workflowTemplateRef": {
@@ -15870,6 +16512,10 @@
             "description": "WorkflowStatus contains overall status information about a workflow",
             "type": "object",
             "properties": {
+                "artifactGCStatus": {
+                    "description": "ArtifactGCStatus maintains the status of Artifact Garbage Collection",
+                    "$ref": "#/definitions/io.argoproj.workflow.v1alpha1.ArtGCStatus"
+                },
                 "artifactRepositoryRef": {
                     "description": "ArtifactRepositoryRef is used to cache the repository to use so we do not need to determine it everytime we reconcile.",
                     "$ref": "#/definitions/io.argoproj.workflow.v1alpha1.ArtifactRepositoryRefStatus"
@@ -17864,7 +18510,7 @@
             "type": "object",
             "properties": {
                 "maxSurge": {
-                    "description": "The maximum number of nodes with an existing available DaemonSet pod that can have an updated DaemonSet pod during during an update. Value can be an absolute number (ex: 5) or a percentage of desired pods (ex: 10%). This can not be 0 if MaxUnavailable is 0. Absolute number is calculated from percentage by rounding up to a minimum of 1. Default value is 0. Example: when this is set to 30%, at most 30% of the total number of nodes that should be running the daemon pod (i.e. status.desiredNumberScheduled) can have their a new pod created before the old pod is marked as deleted. The update starts by launching new pods on 30% of nodes. Once an updated pod is available (Ready for at least minReadySeconds) the old DaemonSet pod on that node is marked deleted. If the old pod becomes unavailable for any reason (Ready transitions to false, is evicted, or is drained) an updated pod is immediatedly created on that node without considering surge limits. Allowing surge implies the possibility that the resources consumed by the daemonset on any given node can double if the readiness check fails, and so resource intensive daemonsets should take into account that they may cause evictions during disruption. This is beta field and enabled/disabled by DaemonSetUpdateSurge feature gate.",
+                    "description": "The maximum number of nodes with an existing available DaemonSet pod that can have an updated DaemonSet pod during during an update. Value can be an absolute number (ex: 5) or a percentage of desired pods (ex: 10%). This can not be 0 if MaxUnavailable is 0. Absolute number is calculated from percentage by rounding up to a minimum of 1. Default value is 0. Example: when this is set to 30%, at most 30% of the total number of nodes that should be running the daemon pod (i.e. status.desiredNumberScheduled) can have their a new pod created before the old pod is marked as deleted. The update starts by launching new pods on 30% of nodes. Once an updated pod is available (Ready for at least minReadySeconds) the old DaemonSet pod on that node is marked deleted. If the old pod becomes unavailable for any reason (Ready transitions to false, is evicted, or is drained) an updated pod is immediatedly created on that node without considering surge limits. Allowing surge implies the possibility that the resources consumed by the daemonset on any given node can double if the readiness check fails, and so resource intensive daemonsets should take into account that they may cause evictions during disruption.",
                     "$ref": "#/definitions/io.k8s.apimachinery.pkg.util.intstr.IntOrString"
                 },
                 "maxUnavailable": {
@@ -17906,7 +18552,7 @@
             "x-kubernetes-group-version-kind": []
         },
         "io.k8s.api.apps.v1.StatefulSet": {
-            "description": "StatefulSet represents a set of pods with consistent identities. Identities are defined as:\n - Network: A single stable DNS and hostname.\n - Storage: As many VolumeClaims as requested.\nThe StatefulSet guarantees that a given network identity will always map to the same storage identity.",
+            "description": "StatefulSet represents a set of pods with consistent identities. Identities are defined as:\n  - Network: A single stable DNS and hostname.\n  - Storage: As many VolumeClaims as requested.\n\nThe StatefulSet guarantees that a given network identity will always map to the same storage identity.",
             "type": "object",
             "properties": {
                 "apiVersion": {
@@ -18037,7 +18683,7 @@
             ],
             "properties": {
                 "minReadySeconds": {
-                    "description": "Minimum number of seconds for which a newly created pod should be ready without any of its container crashing for it to be considered available. Defaults to 0 (pod will be considered available as soon as it is ready) This is an alpha field and requires enabling StatefulSetMinReadySeconds feature gate.",
+                    "description": "Minimum number of seconds for which a newly created pod should be ready without any of its container crashing for it to be considered available. Defaults to 0 (pod will be considered available as soon as it is ready)",
                     "type": "integer",
                     "format": "int32"
                 },
@@ -18101,7 +18747,7 @@
             ],
             "properties": {
                 "availableReplicas": {
-                    "description": "Total number of available pods (ready for at least minReadySeconds) targeted by this statefulset. This is a beta field and enabled/disabled by StatefulSetMinReadySeconds feature gate.",
+                    "description": "Total number of available pods (ready for at least minReadySeconds) targeted by this statefulset.",
                     "type": "integer",
                     "format": "int32",
                     "default": 0
@@ -18613,7 +19259,7 @@
             "x-kubernetes-group-version-kind": []
         },
         "io.k8s.api.apps.v1beta1.StatefulSet": {
-            "description": "DEPRECATED - This group version of StatefulSet is deprecated by apps/v1beta2/StatefulSet. See the release notes for more information. StatefulSet represents a set of pods with consistent identities. Identities are defined as:\n - Network: A single stable DNS and hostname.\n - Storage: As many VolumeClaims as requested.\nThe StatefulSet guarantees that a given network identity will always map to the same storage identity.",
+            "description": "DEPRECATED - This group version of StatefulSet is deprecated by apps/v1beta2/StatefulSet. See the release notes for more information. StatefulSet represents a set of pods with consistent identities. Identities are defined as:\n  - Network: A single stable DNS and hostname.\n  - Storage: As many VolumeClaims as requested.\n\nThe StatefulSet guarantees that a given network identity will always map to the same storage identity.",
             "type": "object",
             "properties": {
                 "apiVersion": {
@@ -18728,7 +19374,7 @@
             ],
             "properties": {
                 "minReadySeconds": {
-                    "description": "Minimum number of seconds for which a newly created pod should be ready without any of its container crashing for it to be considered available. Defaults to 0 (pod will be considered available as soon as it is ready) This is an alpha field and requires enabling StatefulSetMinReadySeconds feature gate.",
+                    "description": "Minimum number of seconds for which a newly created pod should be ready without any of its container crashing for it to be considered available. Defaults to 0 (pod will be considered available as soon as it is ready)",
                     "type": "integer",
                     "format": "int32"
                 },
@@ -18788,7 +19434,7 @@
             ],
             "properties": {
                 "availableReplicas": {
-                    "description": "Total number of available pods (ready for at least minReadySeconds) targeted by this StatefulSet. This is a beta field and enabled/disabled by StatefulSetMinReadySeconds feature gate.",
+                    "description": "Total number of available pods (ready for at least minReadySeconds) targeted by this StatefulSet.",
                     "type": "integer",
                     "format": "int32",
                     "default": 0
@@ -19534,7 +20180,7 @@
             "type": "object",
             "properties": {
                 "maxSurge": {
-                    "description": "The maximum number of nodes with an existing available DaemonSet pod that can have an updated DaemonSet pod during during an update. Value can be an absolute number (ex: 5) or a percentage of desired pods (ex: 10%). This can not be 0 if MaxUnavailable is 0. Absolute number is calculated from percentage by rounding up to a minimum of 1. Default value is 0. Example: when this is set to 30%, at most 30% of the total number of nodes that should be running the daemon pod (i.e. status.desiredNumberScheduled) can have their a new pod created before the old pod is marked as deleted. The update starts by launching new pods on 30% of nodes. Once an updated pod is available (Ready for at least minReadySeconds) the old DaemonSet pod on that node is marked deleted. If the old pod becomes unavailable for any reason (Ready transitions to false, is evicted, or is drained) an updated pod is immediatedly created on that node without considering surge limits. Allowing surge implies the possibility that the resources consumed by the daemonset on any given node can double if the readiness check fails, and so resource intensive daemonsets should take into account that they may cause evictions during disruption. This is beta field and enabled/disabled by DaemonSetUpdateSurge feature gate.",
+                    "description": "The maximum number of nodes with an existing available DaemonSet pod that can have an updated DaemonSet pod during during an update. Value can be an absolute number (ex: 5) or a percentage of desired pods (ex: 10%). This can not be 0 if MaxUnavailable is 0. Absolute number is calculated from percentage by rounding up to a minimum of 1. Default value is 0. Example: when this is set to 30%, at most 30% of the total number of nodes that should be running the daemon pod (i.e. status.desiredNumberScheduled) can have their a new pod created before the old pod is marked as deleted. The update starts by launching new pods on 30% of nodes. Once an updated pod is available (Ready for at least minReadySeconds) the old DaemonSet pod on that node is marked deleted. If the old pod becomes unavailable for any reason (Ready transitions to false, is evicted, or is drained) an updated pod is immediatedly created on that node without considering surge limits. Allowing surge implies the possibility that the resources consumed by the daemonset on any given node can double if the readiness check fails, and so resource intensive daemonsets should take into account that they may cause evictions during disruption.",
                     "$ref": "#/definitions/io.k8s.apimachinery.pkg.util.intstr.IntOrString"
                 },
                 "maxUnavailable": {
@@ -19647,7 +20293,7 @@
             "x-kubernetes-group-version-kind": []
         },
         "io.k8s.api.apps.v1beta2.StatefulSet": {
-            "description": "DEPRECATED - This group version of StatefulSet is deprecated by apps/v1/StatefulSet. See the release notes for more information. StatefulSet represents a set of pods with consistent identities. Identities are defined as:\n - Network: A single stable DNS and hostname.\n - Storage: As many VolumeClaims as requested.\nThe StatefulSet guarantees that a given network identity will always map to the same storage identity.",
+            "description": "DEPRECATED - This group version of StatefulSet is deprecated by apps/v1/StatefulSet. See the release notes for more information. StatefulSet represents a set of pods with consistent identities. Identities are defined as:\n  - Network: A single stable DNS and hostname.\n  - Storage: As many VolumeClaims as requested.\n\nThe StatefulSet guarantees that a given network identity will always map to the same storage identity.",
             "type": "object",
             "properties": {
                 "apiVersion": {
@@ -19763,7 +20409,7 @@
             ],
             "properties": {
                 "minReadySeconds": {
-                    "description": "Minimum number of seconds for which a newly created pod should be ready without any of its container crashing for it to be considered available. Defaults to 0 (pod will be considered available as soon as it is ready) This is an alpha field and requires enabling StatefulSetMinReadySeconds feature gate.",
+                    "description": "Minimum number of seconds for which a newly created pod should be ready without any of its container crashing for it to be considered available. Defaults to 0 (pod will be considered available as soon as it is ready)",
                     "type": "integer",
                     "format": "int32"
                 },
@@ -19823,7 +20469,7 @@
             ],
             "properties": {
                 "availableReplicas": {
-                    "description": "Total number of available pods (ready for at least minReadySeconds) targeted by this StatefulSet. This is a beta field and enabled/disabled by StatefulSetMinReadySeconds feature gate.",
+                    "description": "Total number of available pods (ready for at least minReadySeconds) targeted by this StatefulSet.",
                     "type": "integer",
                     "format": "int32",
                     "default": 0
@@ -19965,7 +20611,7 @@
             ],
             "properties": {
                 "audiences": {
-                    "description": "Audiences are the intendend audiences of the token. A recipient of a token must identitfy themself with an identifier in the list of audiences of the token, and otherwise should reject the token. A token issued for multiple audiences may be used to authenticate against any of the audiences listed but implies a high degree of trust between the target audiences.",
+                    "description": "Audiences are the intendend audiences of the token. A recipient of a token must identify themself with an identifier in the list of audiences of the token, and otherwise should reject the token. A token issued for multiple audiences may be used to authenticate against any of the audiences listed but implies a high degree of trust between the target audiences.",
                     "type": "array",
                     "items": {
                         "type": "string",
@@ -21552,7 +22198,7 @@
                     "type": "boolean"
                 },
                 "timeZone": {
-                    "description": "The time zone for the given schedule, see https://en.wikipedia.org/wiki/List_of_tz_database_time_zones. If not specified, this will rely on the time zone of the kube-controller-manager process. ALPHA: This field is in alpha and must be enabled via the `CronJobTimeZone` feature gate.",
+                    "description": "The time zone name for the given schedule, see https://en.wikipedia.org/wiki/List_of_tz_database_time_zones. If not specified, this will default to the time zone of the kube-controller-manager process. The set of valid time zone names and the time zone offset is loaded from the system-wide time zone database by the API server during CronJob validation and the controller manager during execution. If no system-wide time zone database can be found a bundled version of the database is used instead. If the time zone name becomes invalid during the lifetime of a CronJob or due to a change in host configuration, the controller will stop creating new new Jobs and will create a system event with the reason UnknownTimeZone. More information can be found in https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs/#time-zones This is beta field and must be enabled via the `CronJobTimeZone` feature gate.",
                     "type": "string"
                 }
             },
@@ -21729,6 +22375,10 @@
                     "type": "integer",
                     "format": "int32"
                 },
+                "podFailurePolicy": {
+                    "description": "Specifies the policy of handling failed pods. In particular, it allows to specify the set of actions and conditions which need to be satisfied to take the associated action. If empty, the default behaviour applies - the counter of failed pods, represented by the jobs's .status.failed field, is incremented and it is checked against the backoffLimit. This field cannot be used in combination with restartPolicy=OnFailure.\n\nThis field is alpha-level. To use this field, you must enable the `JobPodFailurePolicy` feature gate (disabled by default).",
+                    "$ref": "#/definitions/io.k8s.api.batch.v1.PodFailurePolicy"
+                },
                 "selector": {
                     "description": "A label query over pods that should match the pod count. Normally, the system sets this field for you. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors",
                     "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.LabelSelector"
@@ -21817,6 +22467,114 @@
                     "description": "Specification of the desired behavior of the job. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status",
                     "default": {},
                     "$ref": "#/definitions/io.k8s.api.batch.v1.JobSpec"
+                }
+            },
+            "x-kubernetes-group-version-kind": []
+        },
+        "io.k8s.api.batch.v1.PodFailurePolicy": {
+            "description": "PodFailurePolicy describes how failed pods influence the backoffLimit.",
+            "type": "object",
+            "required": [
+                "rules"
+            ],
+            "properties": {
+                "rules": {
+                    "description": "A list of pod failure policy rules. The rules are evaluated in order. Once a rule matches a Pod failure, the remaining of the rules are ignored. When no rule matches the Pod failure, the default handling applies - the counter of pod failures is incremented and it is checked against the backoffLimit. At most 20 elements are allowed.",
+                    "type": "array",
+                    "items": {
+                        "default": {},
+                        "$ref": "#/definitions/io.k8s.api.batch.v1.PodFailurePolicyRule"
+                    },
+                    "x-kubernetes-list-type": "atomic"
+                }
+            },
+            "x-kubernetes-group-version-kind": []
+        },
+        "io.k8s.api.batch.v1.PodFailurePolicyOnExitCodesRequirement": {
+            "description": "PodFailurePolicyOnExitCodesRequirement describes the requirement for handling a failed pod based on its container exit codes. In particular, it lookups the .state.terminated.exitCode for each app container and init container status, represented by the .status.containerStatuses and .status.initContainerStatuses fields in the Pod status, respectively. Containers completed with success (exit code 0) are excluded from the requirement check.",
+            "type": "object",
+            "required": [
+                "operator",
+                "values"
+            ],
+            "properties": {
+                "containerName": {
+                    "description": "Restricts the check for exit codes to the container with the specified name. When null, the rule applies to all containers. When specified, it should match one the container or initContainer names in the pod template.",
+                    "type": "string"
+                },
+                "operator": {
+                    "description": "Represents the relationship between the container exit code(s) and the specified values. Containers completed with success (exit code 0) are excluded from the requirement check. Possible values are: - In: the requirement is satisfied if at least one container exit code\n  (might be multiple if there are multiple containers not restricted\n  by the 'containerName' field) is in the set of specified values.\n- NotIn: the requirement is satisfied if at least one container exit code\n  (might be multiple if there are multiple containers not restricted\n  by the 'containerName' field) is not in the set of specified values.\nAdditional values are considered to be added in the future. Clients should react to an unknown operator by assuming the requirement is not satisfied.\n\nPossible enum values:\n - `\"In\"`\n - `\"NotIn\"`",
+                    "type": "string",
+                    "default": "",
+                    "enum": [
+                        "In",
+                        "NotIn"
+                    ]
+                },
+                "values": {
+                    "description": "Specifies the set of values. Each returned container exit code (might be multiple in case of multiple containers) is checked against this set of values with respect to the operator. The list of values must be ordered and must not contain duplicates. Value '0' cannot be used for the In operator. At least one element is required. At most 255 elements are allowed.",
+                    "type": "array",
+                    "items": {
+                        "type": "integer",
+                        "format": "int32",
+                        "default": 0
+                    },
+                    "x-kubernetes-list-type": "set"
+                }
+            },
+            "x-kubernetes-group-version-kind": []
+        },
+        "io.k8s.api.batch.v1.PodFailurePolicyOnPodConditionsPattern": {
+            "description": "PodFailurePolicyOnPodConditionsPattern describes a pattern for matching an actual pod condition type.",
+            "type": "object",
+            "required": [
+                "type",
+                "status"
+            ],
+            "properties": {
+                "status": {
+                    "description": "Specifies the required Pod condition status. To match a pod condition it is required that the specified status equals the pod condition status. Defaults to True.",
+                    "type": "string",
+                    "default": ""
+                },
+                "type": {
+                    "description": "Specifies the required Pod condition type. To match a pod condition it is required that specified type equals the pod condition type.",
+                    "type": "string",
+                    "default": ""
+                }
+            },
+            "x-kubernetes-group-version-kind": []
+        },
+        "io.k8s.api.batch.v1.PodFailurePolicyRule": {
+            "description": "PodFailurePolicyRule describes how a pod failure is handled when the requirements are met. One of OnExitCodes and onPodConditions, but not both, can be used in each rule.",
+            "type": "object",
+            "required": [
+                "action",
+                "onPodConditions"
+            ],
+            "properties": {
+                "action": {
+                    "description": "Specifies the action taken on a pod failure when the requirements are satisfied. Possible values are: - FailJob: indicates that the pod's job is marked as Failed and all\n  running pods are terminated.\n- Ignore: indicates that the counter towards the .backoffLimit is not\n  incremented and a replacement pod is created.\n- Count: indicates that the pod is handled in the default way - the\n  counter towards the .backoffLimit is incremented.\nAdditional values are considered to be added in the future. Clients should react to an unknown action by skipping the rule.\n\nPossible enum values:\n - `\"Count\"` This is an action which might be taken on a pod failure - the pod failure is handled in the default way - the counter towards .backoffLimit, represented by the job's .status.failed field, is incremented.\n - `\"FailJob\"` This is an action which might be taken on a pod failure - mark the pod's job as Failed and terminate all running pods.\n - `\"Ignore\"` This is an action which might be taken on a pod failure - the counter towards .backoffLimit, represented by the job's .status.failed field, is not incremented and a replacement pod is created.",
+                    "type": "string",
+                    "default": "",
+                    "enum": [
+                        "Count",
+                        "FailJob",
+                        "Ignore"
+                    ]
+                },
+                "onExitCodes": {
+                    "description": "Represents the requirement on the container exit codes.",
+                    "$ref": "#/definitions/io.k8s.api.batch.v1.PodFailurePolicyOnExitCodesRequirement"
+                },
+                "onPodConditions": {
+                    "description": "Represents the requirement on the pod conditions. The requirement is represented as a list of pod condition patterns. The requirement is satisfied if at least one pattern matches an actual pod condition. At most 20 elements are allowed.",
+                    "type": "array",
+                    "items": {
+                        "default": {},
+                        "$ref": "#/definitions/io.k8s.api.batch.v1.PodFailurePolicyOnPodConditionsPattern"
+                    },
+                    "x-kubernetes-list-type": "atomic"
                 }
             },
             "x-kubernetes-group-version-kind": []
@@ -21961,7 +22719,7 @@
                     "type": "boolean"
                 },
                 "timeZone": {
-                    "description": "The time zone for the given schedule, see https://en.wikipedia.org/wiki/List_of_tz_database_time_zones. If not specified, this will rely on the time zone of the kube-controller-manager process. ALPHA: This field is in alpha and must be enabled via the `CronJobTimeZone` feature gate.",
+                    "description": "The time zone name for the given schedule, see https://en.wikipedia.org/wiki/List_of_tz_database_time_zones. If not specified, this will default to the time zone of the kube-controller-manager process. The set of valid time zone names and the time zone offset is loaded from the system-wide time zone database by the API server during CronJob validation and the controller manager during execution. If no system-wide time zone database can be found a bundled version of the database is used instead. If the time zone name becomes invalid during the lifetime of a CronJob or due to a change in host configuration, the controller will stop creating new new Jobs and will create a system event with the reason UnknownTimeZone. More information can be found in https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs/#time-zones This is beta field and must be enabled via the `CronJobTimeZone` feature gate.",
                     "type": "string"
                 }
             },
@@ -22647,7 +23405,7 @@
             ],
             "properties": {
                 "controllerExpandSecretRef": {
-                    "description": "controllerExpandSecretRef is a reference to the secret object containing sensitive information to pass to the CSI driver to complete the CSI ControllerExpandVolume call. This is an alpha field and requires enabling ExpandCSIVolumes feature gate. This field is optional, and may be empty if no secret is required. If the secret object contains more than one secret, all secrets are passed.",
+                    "description": "controllerExpandSecretRef is a reference to the secret object containing sensitive information to pass to the CSI driver to complete the CSI ControllerExpandVolume call. This is an beta field and requires enabling ExpandCSIVolumes feature gate. This field is optional, and may be empty if no secret is required. If the secret object contains more than one secret, all secrets are passed.",
                     "$ref": "#/definitions/io.k8s.api.core.v1.SecretReference"
                 },
                 "controllerPublishSecretRef": {
@@ -22662,6 +23420,10 @@
                 "fsType": {
                     "description": "fsType to mount. Must be a filesystem type supported by the host operating system. Ex. \"ext4\", \"xfs\", \"ntfs\".",
                     "type": "string"
+                },
+                "nodeExpandSecretRef": {
+                    "description": "nodeExpandSecretRef is a reference to the secret object containing sensitive information to pass to the CSI driver to complete the CSI NodeExpandVolume call. This is an alpha field and requires enabling CSINodeExpandSecret feature gate. This field is optional, may be omitted if no secret is required. If the secret object contains more than one secret, all secrets are passed.",
+                    "$ref": "#/definitions/io.k8s.api.core.v1.SecretReference"
                 },
                 "nodePublishSecretRef": {
                     "description": "nodePublishSecretRef is a reference to the secret object containing sensitive information to pass to the CSI driver to complete the CSI NodePublishVolume and NodeUnpublishVolume calls. This field is optional, and may be empty if no secret is required. If the secret object contains more than one secret, all secrets are passed.",
@@ -23269,7 +24031,7 @@
                     "default": ""
                 },
                 "ports": {
-                    "description": "List of ports to expose from the container. Exposing a port here gives the system additional information about the network connections a container uses, but is primarily informational. Not specifying a port here DOES NOT prevent that port from being exposed. Any port which is listening on the default \"0.0.0.0\" address inside a container will be accessible from the network. Cannot be updated.",
+                    "description": "List of ports to expose from the container. Not specifying a port here DOES NOT prevent that port from being exposed. Any port which is listening on the default \"0.0.0.0\" address inside a container will be accessible from the network. Modifying this array with strategic merge patch may corrupt the data. For more information See https://github.com/kubernetes/kubernetes/issues/108255. Cannot be updated.",
                     "type": "array",
                     "items": {
                         "default": {},
@@ -23356,7 +24118,7 @@
             "type": "object",
             "properties": {
                 "names": {
-                    "description": "Names by which this image is known. e.g. [\"k8s.gcr.io/hyperkube:v1.0.7\", \"dockerhub.io/google_containers/hyperkube:v1.0.7\"]",
+                    "description": "Names by which this image is known. e.g. [\"kubernetes.example/hyperkube:v1.0.7\", \"cloud-vendor.registry.example/cloud-vendor/hyperkube:v1.0.7\"]",
                     "type": "array",
                     "items": {
                         "type": "string",
@@ -23714,7 +24476,7 @@
             "x-kubernetes-group-version-kind": []
         },
         "io.k8s.api.core.v1.EndpointSubset": {
-            "description": "EndpointSubset is a group of addresses with a common set of ports. The expanded set of endpoints is the Cartesian product of Addresses x Ports. For example, given:\n  {\n    Addresses: [{\"ip\": \"10.10.1.1\"}, {\"ip\": \"10.10.2.2\"}],\n    Ports:     [{\"name\": \"a\", \"port\": 8675}, {\"name\": \"b\", \"port\": 309}]\n  }\nThe resulting set of endpoints can be viewed as:\n    a: [ 10.10.1.1:8675, 10.10.2.2:8675 ],\n    b: [ 10.10.1.1:309, 10.10.2.2:309 ]",
+            "description": "EndpointSubset is a group of addresses with a common set of ports. The expanded set of endpoints is the Cartesian product of Addresses x Ports. For example, given:\n\n\t{\n\t  Addresses: [{\"ip\": \"10.10.1.1\"}, {\"ip\": \"10.10.2.2\"}],\n\t  Ports:     [{\"name\": \"a\", \"port\": 8675}, {\"name\": \"b\", \"port\": 309}]\n\t}\n\nThe resulting set of endpoints can be viewed as:\n\n\ta: [ 10.10.1.1:8675, 10.10.2.2:8675 ],\n\tb: [ 10.10.1.1:309, 10.10.2.2:309 ]",
             "type": "object",
             "properties": {
                 "addresses": {
@@ -23745,7 +24507,7 @@
             "x-kubernetes-group-version-kind": []
         },
         "io.k8s.api.core.v1.Endpoints": {
-            "description": "Endpoints is a collection of endpoints that implement the actual service. Example:\n  Name: \"mysvc\",\n  Subsets: [\n    {\n      Addresses: [{\"ip\": \"10.10.1.1\"}, {\"ip\": \"10.10.2.2\"}],\n      Ports: [{\"name\": \"a\", \"port\": 8675}, {\"name\": \"b\", \"port\": 309}]\n    },\n    {\n      Addresses: [{\"ip\": \"10.10.3.3\"}],\n      Ports: [{\"name\": \"a\", \"port\": 93}, {\"name\": \"b\", \"port\": 76}]\n    },\n ]",
+            "description": "Endpoints is a collection of endpoints that implement the actual service. Example:\n\n\t Name: \"mysvc\",\n\t Subsets: [\n\t   {\n\t     Addresses: [{\"ip\": \"10.10.1.1\"}, {\"ip\": \"10.10.2.2\"}],\n\t     Ports: [{\"name\": \"a\", \"port\": 8675}, {\"name\": \"b\", \"port\": 309}]\n\t   },\n\t   {\n\t     Addresses: [{\"ip\": \"10.10.3.3\"}],\n\t     Ports: [{\"name\": \"a\", \"port\": 93}, {\"name\": \"b\", \"port\": 76}]\n\t   },\n\t]",
             "type": "object",
             "properties": {
                 "apiVersion": {
@@ -23881,7 +24643,7 @@
             "x-kubernetes-group-version-kind": []
         },
         "io.k8s.api.core.v1.EphemeralContainer": {
-            "description": "An EphemeralContainer is a temporary container that you may add to an existing Pod for user-initiated activities such as debugging. Ephemeral containers have no resource or scheduling guarantees, and they will not be restarted when they exit or when a Pod is removed or restarted. The kubelet may evict a Pod if an ephemeral container causes the Pod to exceed its resource allocation.\n\nTo add an ephemeral container, use the ephemeralcontainers subresource of an existing Pod. Ephemeral containers may not be removed or restarted.\n\nThis is a beta feature available on clusters that haven't disabled the EphemeralContainers feature gate.",
+            "description": "An EphemeralContainer is a temporary container that you may add to an existing Pod for user-initiated activities such as debugging. Ephemeral containers have no resource or scheduling guarantees, and they will not be restarted when they exit or when a Pod is removed or restarted. The kubelet may evict a Pod if an ephemeral container causes the Pod to exceed its resource allocation.\n\nTo add an ephemeral container, use the ephemeralcontainers subresource of an existing Pod. Ephemeral containers may not be removed or restarted.",
             "type": "object",
             "required": [
                 "name"
@@ -26347,6 +27109,7 @@
                 },
                 "claimRef": {
                     "description": "claimRef is part of a bi-directional binding between PersistentVolume and PersistentVolumeClaim. Expected to be non-nil when bound. claim.VolumeName is the authoritative bind between PV and PVC. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#binding",
+                    "x-kubernetes-map-type": "granular",
                     "$ref": "#/definitions/io.k8s.api.core.v1.ObjectReference"
                 },
                 "csi": {
@@ -26773,7 +27536,7 @@
             "x-kubernetes-group-version-kind": []
         },
         "io.k8s.api.core.v1.PodIP": {
-            "description": "IP address information for entries in the (plural) PodIPs field. Each entry includes:\n   IP: An IP address allocated to the pod. Routable at least within the cluster.",
+            "description": "IP address information for entries in the (plural) PodIPs field. Each entry includes:\n\n\tIP: An IP address allocated to the pod. Routable at least within the cluster.",
             "type": "object",
             "properties": {
                 "ip": {
@@ -27066,7 +27829,7 @@
                     "type": "boolean"
                 },
                 "ephemeralContainers": {
-                    "description": "List of ephemeral containers run in this pod. Ephemeral containers may be run in an existing pod to perform user-initiated actions such as debugging. This list cannot be specified when creating a pod, and it cannot be modified by updating the pod spec. In order to add an ephemeral container to an existing pod, use the pod's ephemeralcontainers subresource. This field is beta-level and available on clusters that haven't disabled the EphemeralContainers feature gate.",
+                    "description": "List of ephemeral containers run in this pod. Ephemeral containers may be run in an existing pod to perform user-initiated actions such as debugging. This list cannot be specified when creating a pod, and it cannot be modified by updating the pod spec. In order to add an ephemeral container to an existing pod, use the pod's ephemeralcontainers subresource.",
                     "type": "array",
                     "items": {
                         "default": {},
@@ -27095,6 +27858,10 @@
                 },
                 "hostPID": {
                     "description": "Use the host's pid namespace. Optional: Default to false.",
+                    "type": "boolean"
+                },
+                "hostUsers": {
+                    "description": "Use the host's user namespace. Optional: Default to true. If set to true or not present, the pod will be run in the host user namespace, useful for when the pod needs a feature only available to the host user namespace, such as loading a kernel module with CAP_SYS_MODULE. When set to false, a new userns is created for the pod. Setting false is useful for mitigating container breakout vulnerabilities even allowing users to run their containers as root without actually having root privileges on the host. This field is alpha-level and is only honored by servers that enable the UserNamespacesSupport feature.",
                     "type": "boolean"
                 },
                 "hostname": {
@@ -27135,7 +27902,7 @@
                     "x-kubernetes-map-type": "atomic"
                 },
                 "os": {
-                    "description": "Specifies the OS of the containers in the pod. Some pod and container fields are restricted if this is set.\n\nIf the OS field is set to linux, the following fields must be unset: -securityContext.windowsOptions\n\nIf the OS field is set to windows, following fields must be unset: - spec.hostPID - spec.hostIPC - spec.securityContext.seLinuxOptions - spec.securityContext.seccompProfile - spec.securityContext.fsGroup - spec.securityContext.fsGroupChangePolicy - spec.securityContext.sysctls - spec.shareProcessNamespace - spec.securityContext.runAsUser - spec.securityContext.runAsGroup - spec.securityContext.supplementalGroups - spec.containers[*].securityContext.seLinuxOptions - spec.containers[*].securityContext.seccompProfile - spec.containers[*].securityContext.capabilities - spec.containers[*].securityContext.readOnlyRootFilesystem - spec.containers[*].securityContext.privileged - spec.containers[*].securityContext.allowPrivilegeEscalation - spec.containers[*].securityContext.procMount - spec.containers[*].securityContext.runAsUser - spec.containers[*].securityContext.runAsGroup This is a beta field and requires the IdentifyPodOS feature",
+                    "description": "Specifies the OS of the containers in the pod. Some pod and container fields are restricted if this is set.\n\nIf the OS field is set to linux, the following fields must be unset: -securityContext.windowsOptions\n\nIf the OS field is set to windows, following fields must be unset: - spec.hostPID - spec.hostIPC - spec.hostUsers - spec.securityContext.seLinuxOptions - spec.securityContext.seccompProfile - spec.securityContext.fsGroup - spec.securityContext.fsGroupChangePolicy - spec.securityContext.sysctls - spec.shareProcessNamespace - spec.securityContext.runAsUser - spec.securityContext.runAsGroup - spec.securityContext.supplementalGroups - spec.containers[*].securityContext.seLinuxOptions - spec.containers[*].securityContext.seccompProfile - spec.containers[*].securityContext.capabilities - spec.containers[*].securityContext.readOnlyRootFilesystem - spec.containers[*].securityContext.privileged - spec.containers[*].securityContext.allowPrivilegeEscalation - spec.containers[*].securityContext.procMount - spec.containers[*].securityContext.runAsUser - spec.containers[*].securityContext.runAsGroup",
                     "$ref": "#/definitions/io.k8s.api.core.v1.PodOS"
                 },
                 "overhead": {
@@ -27272,7 +28039,7 @@
                     }
                 },
                 "ephemeralContainerStatuses": {
-                    "description": "Status for any ephemeral containers that have run in this pod. This field is beta-level and available on clusters that haven't disabled the EphemeralContainers feature gate.",
+                    "description": "Status for any ephemeral containers that have run in this pod.",
                     "type": "array",
                     "items": {
                         "default": {},
@@ -28941,7 +29708,7 @@
                     "type": "string"
                 },
                 "externalTrafficPolicy": {
-                    "description": "externalTrafficPolicy denotes if this Service desires to route external traffic to node-local or cluster-wide endpoints. \"Local\" preserves the client source IP and avoids a second hop for LoadBalancer and Nodeport type services, but risks potentially imbalanced traffic spreading. \"Cluster\" obscures the client source IP and may cause a second hop to another node, but should have good overall load-spreading.\n\nPossible enum values:\n - `\"Cluster\"` specifies node-global (legacy) behavior.\n - `\"Local\"` specifies node-local endpoints behavior.",
+                    "description": "externalTrafficPolicy describes how nodes distribute service traffic they receive on one of the Service's \"externally-facing\" addresses (NodePorts, ExternalIPs, and LoadBalancer IPs). If set to \"Local\", the proxy will configure the service in a way that assumes that external load balancers will take care of balancing the service traffic between nodes, and so each node will deliver traffic only to the node-local endpoints of the service, without masquerading the client source IP. (Traffic mistakenly sent to a node with no endpoints will be dropped.) The default value, \"Cluster\", uses the standard behavior of routing to all endpoints evenly (possibly modified by topology and other features). Note that traffic sent to an External IP or LoadBalancer IP from within the cluster will always get \"Cluster\" semantics, but clients sending to a NodePort from within the cluster may need to take traffic policy into account when picking a node.\n\nPossible enum values:\n - `\"Cluster\"` routes traffic to all endpoints.\n - `\"Local\"` preserves the source IP of the traffic by routing only to endpoints on the same node as the traffic was received on (dropping the traffic if there are no local endpoints).",
                     "type": "string",
                     "enum": [
                         "Cluster",
@@ -28949,12 +29716,12 @@
                     ]
                 },
                 "healthCheckNodePort": {
-                    "description": "healthCheckNodePort specifies the healthcheck nodePort for the service. This only applies when type is set to LoadBalancer and externalTrafficPolicy is set to Local. If a value is specified, is in-range, and is not in use, it will be used.  If not specified, a value will be automatically allocated.  External systems (e.g. load-balancers) can use this port to determine if a given node holds endpoints for this service or not.  If this field is specified when creating a Service which does not need it, creation will fail. This field will be wiped when updating a Service to no longer need it (e.g. changing type).",
+                    "description": "healthCheckNodePort specifies the healthcheck nodePort for the service. This only applies when type is set to LoadBalancer and externalTrafficPolicy is set to Local. If a value is specified, is in-range, and is not in use, it will be used.  If not specified, a value will be automatically allocated.  External systems (e.g. load-balancers) can use this port to determine if a given node holds endpoints for this service or not.  If this field is specified when creating a Service which does not need it, creation will fail. This field will be wiped when updating a Service to no longer need it (e.g. changing type). This field cannot be updated once set.",
                     "type": "integer",
                     "format": "int32"
                 },
                 "internalTrafficPolicy": {
-                    "description": "InternalTrafficPolicy specifies if the cluster internal traffic should be routed to all endpoints or node-local endpoints only. \"Cluster\" routes internal traffic to a Service to all endpoints. \"Local\" routes traffic to node-local endpoints only, traffic is dropped if no node-local endpoints are ready. The default value is \"Cluster\".",
+                    "description": "InternalTrafficPolicy describes how nodes distribute service traffic they receive on the ClusterIP. If set to \"Local\", the proxy will assume that pods only want to talk to endpoints of the service on the same node as the pod, dropping the traffic if there are no local endpoints. The default value, \"Cluster\", uses the standard behavior of routing to all endpoints evenly (possibly modified by topology and other features).",
                     "type": "string"
                 },
                 "ipFamilies": {
@@ -29294,6 +30061,15 @@
                     "description": "LabelSelector is used to find matching pods. Pods that match this label selector are counted to determine the number of pods in their corresponding topology domain.",
                     "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.LabelSelector"
                 },
+                "matchLabelKeys": {
+                    "description": "MatchLabelKeys is a set of pod label keys to select the pods over which spreading will be calculated. The keys are used to lookup values from the incoming pod labels, those key-value labels are ANDed with labelSelector to select the group of existing pods over which spreading will be calculated for the incoming pod. Keys that don't exist in the incoming pod labels will be ignored. A null or empty list means only match against labelSelector.",
+                    "type": "array",
+                    "items": {
+                        "type": "string",
+                        "default": ""
+                    },
+                    "x-kubernetes-list-type": "atomic"
+                },
                 "maxSkew": {
                     "description": "MaxSkew describes the degree to which pods may be unevenly distributed. When `whenUnsatisfiable=DoNotSchedule`, it is the maximum permitted difference between the number of matching pods in the target topology and the global minimum. The global minimum is the minimum number of matching pods in an eligible domain or zero if the number of eligible domains is less than MinDomains. For example, in a 3-zone cluster, MaxSkew is set to 1, and pods with the same labelSelector spread as 2/2/1: In this case, the global minimum is 1. | zone1 | zone2 | zone3 | |  P P  |  P P  |   P   | - if MaxSkew is 1, incoming pod can only be scheduled to zone3 to become 2/2/2; scheduling it onto zone1(zone2) would make the ActualSkew(3-1) on zone1(zone2) violate MaxSkew(1). - if MaxSkew is 2, incoming pod can be scheduled onto any zone. When `whenUnsatisfiable=ScheduleAnyway`, it is used to give higher precedence to topologies that satisfy it. It's a required field. Default value is 1 and 0 is not allowed.",
                     "type": "integer",
@@ -29301,12 +30077,20 @@
                     "default": 0
                 },
                 "minDomains": {
-                    "description": "MinDomains indicates a minimum number of eligible domains. When the number of eligible domains with matching topology keys is less than minDomains, Pod Topology Spread treats \"global minimum\" as 0, and then the calculation of Skew is performed. And when the number of eligible domains with matching topology keys equals or greater than minDomains, this value has no effect on scheduling. As a result, when the number of eligible domains is less than minDomains, scheduler won't schedule more than maxSkew Pods to those domains. If value is nil, the constraint behaves as if MinDomains is equal to 1. Valid values are integers greater than 0. When value is not nil, WhenUnsatisfiable must be DoNotSchedule.\n\nFor example, in a 3-zone cluster, MaxSkew is set to 2, MinDomains is set to 5 and pods with the same labelSelector spread as 2/2/2: | zone1 | zone2 | zone3 | |  P P  |  P P  |  P P  | The number of domains is less than 5(MinDomains), so \"global minimum\" is treated as 0. In this situation, new pod with the same labelSelector cannot be scheduled, because computed skew will be 3(3 - 0) if new Pod is scheduled to any of the three zones, it will violate MaxSkew.\n\nThis is an alpha field and requires enabling MinDomainsInPodTopologySpread feature gate.",
+                    "description": "MinDomains indicates a minimum number of eligible domains. When the number of eligible domains with matching topology keys is less than minDomains, Pod Topology Spread treats \"global minimum\" as 0, and then the calculation of Skew is performed. And when the number of eligible domains with matching topology keys equals or greater than minDomains, this value has no effect on scheduling. As a result, when the number of eligible domains is less than minDomains, scheduler won't schedule more than maxSkew Pods to those domains. If value is nil, the constraint behaves as if MinDomains is equal to 1. Valid values are integers greater than 0. When value is not nil, WhenUnsatisfiable must be DoNotSchedule.\n\nFor example, in a 3-zone cluster, MaxSkew is set to 2, MinDomains is set to 5 and pods with the same labelSelector spread as 2/2/2: | zone1 | zone2 | zone3 | |  P P  |  P P  |  P P  | The number of domains is less than 5(MinDomains), so \"global minimum\" is treated as 0. In this situation, new pod with the same labelSelector cannot be scheduled, because computed skew will be 3(3 - 0) if new Pod is scheduled to any of the three zones, it will violate MaxSkew.\n\nThis is a beta field and requires the MinDomainsInPodTopologySpread feature gate to be enabled (enabled by default).",
                     "type": "integer",
                     "format": "int32"
                 },
+                "nodeAffinityPolicy": {
+                    "description": "NodeAffinityPolicy indicates how we will treat Pod's nodeAffinity/nodeSelector when calculating pod topology spread skew. Options are: - Honor: only nodes matching nodeAffinity/nodeSelector are included in the calculations. - Ignore: nodeAffinity/nodeSelector are ignored. All nodes are included in the calculations.\n\nIf this value is nil, the behavior is equivalent to the Honor policy. This is a alpha-level feature enabled by the NodeInclusionPolicyInPodTopologySpread feature flag.",
+                    "type": "string"
+                },
+                "nodeTaintsPolicy": {
+                    "description": "NodeTaintsPolicy indicates how we will treat node taints when calculating pod topology spread skew. Options are: - Honor: nodes without taints, along with tainted nodes for which the incoming pod has a toleration, are included. - Ignore: node taints are ignored. All nodes are included.\n\nIf this value is nil, the behavior is equivalent to the Ignore policy. This is a alpha-level feature enabled by the NodeInclusionPolicyInPodTopologySpread feature flag.",
+                    "type": "string"
+                },
                 "topologyKey": {
-                    "description": "TopologyKey is the key of node labels. Nodes that have a label with this key and identical values are considered to be in the same topology. We consider each \u003ckey, value\u003e as a \"bucket\", and try to put balanced number of pods into each bucket. We define a domain as a particular instance of a topology. Also, we define an eligible domain as a domain whose nodes match the node selector. e.g. If TopologyKey is \"kubernetes.io/hostname\", each Node is a domain of that topology. And, if TopologyKey is \"topology.kubernetes.io/zone\", each zone is a domain of that topology. It's a required field.",
+                    "description": "TopologyKey is the key of node labels. Nodes that have a label with this key and identical values are considered to be in the same topology. We consider each \u003ckey, value\u003e as a \"bucket\", and try to put balanced number of pods into each bucket. We define a domain as a particular instance of a topology. Also, we define an eligible domain as a domain whose nodes meet the requirements of nodeAffinityPolicy and nodeTaintsPolicy. e.g. If TopologyKey is \"kubernetes.io/hostname\", each Node is a domain of that topology. And, if TopologyKey is \"topology.kubernetes.io/zone\", each zone is a domain of that topology. It's a required field.",
                     "type": "string",
                     "default": ""
                 },
@@ -30730,7 +31514,7 @@
             "type": "object",
             "properties": {
                 "endPort": {
-                    "description": "If set, indicates that the range of ports from port to endPort, inclusive, should be allowed by the policy. This field cannot be defined if the port field is not defined or if the port field is defined as a named (string) port. The endPort must be equal or greater than port. This feature is in Beta state and is enabled by default. It can be disabled using the Feature Gate \"NetworkPolicyEndPort\".",
+                    "description": "If set, indicates that the range of ports from port to endPort, inclusive, should be allowed by the policy. This field cannot be defined if the port field is not defined or if the port field is defined as a named (string) port. The endPort must be equal or greater than port.",
                     "type": "integer",
                     "format": "int32"
                 },
@@ -31727,7 +32511,7 @@
                     "$ref": "#/definitions/io.k8s.api.networking.v1.IngressBackend"
                 },
                 "ingressClassName": {
-                    "description": "IngressClassName is the name of the IngressClass cluster resource. The associated IngressClass defines which controller will implement the resource. This replaces the deprecated `kubernetes.io/ingress.class` annotation. For backwards compatibility, when that annotation is set, it must be given precedence over this field. The controller may emit a warning if the field and annotation have different values. Implementations of this API should ignore Ingresses without a class specified. An IngressClass resource may be marked as default, which can be used to set a default value for this field. For more information, refer to the IngressClass documentation.",
+                    "description": "IngressClassName is the name of an IngressClass cluster resource. Ingress controller implementations use this field to know whether they should be serving this Ingress resource, by a transitive connection (controller -\u003e IngressClass -\u003e Ingress resource). Although the `kubernetes.io/ingress.class` annotation (simple constant name) was never formally defined, it was widely supported by Ingress controllers to create a direct binding between Ingress controller and Ingress resources. Newly created Ingress resources should prefer using the field. However, even though the annotation is officially deprecated, for backwards compatibility reasons, ingress controllers should still honor that annotation if present.",
                     "type": "string"
                 },
                 "rules": {
@@ -31926,7 +32710,7 @@
             "type": "object",
             "properties": {
                 "endPort": {
-                    "description": "If set, indicates that the range of ports from port to endPort, inclusive, should be allowed by the policy. This field cannot be defined if the port field is not defined or if the port field is defined as a named (string) port. The endPort must be equal or greater than port. This feature is in Beta state and is enabled by default. It can be disabled using the Feature Gate \"NetworkPolicyEndPort\".",
+                    "description": "If set, indicates that the range of ports from port to endPort, inclusive, should be allowed by the policy. This field cannot be defined if the port field is not defined or if the port field is defined as a named (string) port. The endPort must be equal or greater than port.",
                     "type": "integer",
                     "format": "int32"
                 },
@@ -32920,7 +33704,7 @@
                     "type": "boolean"
                 },
                 "allowedCSIDrivers": {
-                    "description": "AllowedCSIDrivers is an allowlist of inline CSI drivers that must be explicitly set to be embedded within a pod spec. An empty value indicates that any CSI driver can be used for inline ephemeral volumes. This is a beta field, and is only honored if the API server enables the CSIInlineVolume feature gate.",
+                    "description": "AllowedCSIDrivers is an allowlist of inline CSI drivers that must be explicitly set to be embedded within a pod spec. An empty value indicates that any CSI driver can be used for inline ephemeral volumes.",
                     "type": "array",
                     "items": {
                         "default": {},
@@ -33345,7 +34129,7 @@
             ],
             "properties": {
                 "apiGroups": {
-                    "description": "APIGroups is the name of the APIGroup that contains the resources.  If multiple API groups are specified, any action requested against one of the enumerated resources in any API group will be allowed.",
+                    "description": "APIGroups is the name of the APIGroup that contains the resources.  If multiple API groups are specified, any action requested against one of the enumerated resources in any API group will be allowed. \"\" represents the core API group and \"*\" represents all API groups.",
                     "type": "array",
                     "items": {
                         "type": "string",
@@ -33772,7 +34556,7 @@
             ],
             "properties": {
                 "apiGroups": {
-                    "description": "APIGroups is the name of the APIGroup that contains the resources.  If multiple API groups are specified, any action requested against one of the enumerated resources in any API group will be allowed.",
+                    "description": "APIGroups is the name of the APIGroup that contains the resources.  If multiple API groups are specified, any action requested against one of the enumerated resources in any API group will be allowed. \"\" represents the core API group and \"*\" represents all API groups.",
                     "type": "array",
                     "items": {
                         "type": "string",
@@ -34109,6 +34893,10 @@
                 },
                 "requiresRepublish": {
                     "description": "RequiresRepublish indicates the CSI driver wants `NodePublishVolume` being periodically called to reflect any possible change in the mounted volume. This field defaults to false.\n\nNote: After a successful initial NodePublishVolume call, subsequent calls to NodePublishVolume should only update the contents of the volume. New mount points will not be seen by a running container.",
+                    "type": "boolean"
+                },
+                "seLinuxMount": {
+                    "description": "SELinuxMount specifies if the CSI driver supports \"-o context\" mount option.\n\nWhen \"true\", the CSI driver must ensure that all volumes provided by this CSI driver can be mounted separately with different `-o context` options. This is typical for storage backends that provide volumes as filesystems on block devices or as independent shared volumes. Kubernetes will call NodeStage / NodePublish with \"-o context=xyz\" mount option when mounting a ReadWriteOncePod volume used in Pod that has explicitly set SELinux context. In the future, it may be expanded to other volume AccessModes. In any case, Kubernetes will ensure that the volume is mounted only with a single SELinux context.\n\nWhen \"false\", Kubernetes won't pass any special SELinux mount options to the driver. This is typical for volumes that represent subdirectories of a bigger shared filesystem.\n\nDefault is \"false\".",
                     "type": "boolean"
                 },
                 "storageCapacity": {
@@ -34993,6 +35781,10 @@
                 },
                 "requiresRepublish": {
                     "description": "RequiresRepublish indicates the CSI driver wants `NodePublishVolume` being periodically called to reflect any possible change in the mounted volume. This field defaults to false.\n\nNote: After a successful initial NodePublishVolume call, subsequent calls to NodePublishVolume should only update the contents of the volume. New mount points will not be seen by a running container.",
+                    "type": "boolean"
+                },
+                "seLinuxMount": {
+                    "description": "SELinuxMount specifies if the CSI driver supports \"-o context\" mount option.\n\nWhen \"true\", the CSI driver must ensure that all volumes provided by this CSI driver can be mounted separately with different `-o context` options. This is typical for storage backends that provide volumes as filesystems on block devices or as independent shared volumes. Kubernetes will call NodeStage / NodePublish with \"-o context=xyz\" mount option when mounting a ReadWriteOncePod volume used in Pod that has explicitly set SELinux context. In the future, it may be expanded to other volume AccessModes. In any case, Kubernetes will ensure that the volume is mounted only with a single SELinux context.\n\nWhen \"false\", Kubernetes won't pass any special SELinux mount options to the driver. This is typical for volumes that represent subdirectories of a bigger shared filesystem.\n\nDefault is \"false\".",
                     "type": "boolean"
                 },
                 "storageCapacity": {
