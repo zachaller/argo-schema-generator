@@ -1746,7 +1746,6 @@
                 },
                 "startedAt": {
                     "description": "StartedAt contains time of operation start",
-                    "default": {},
                     "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Time"
                 },
                 "syncResult": {
@@ -2722,7 +2721,6 @@
                 },
                 "deployedAt": {
                     "description": "DeployedAt holds the time the sync operation completed",
-                    "default": {},
                     "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Time"
                 },
                 "id": {
@@ -2763,7 +2761,6 @@
                 },
                 "date": {
                     "description": "Date specifies when the revision was authored",
-                    "default": {},
                     "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Time"
                 },
                 "message": {
